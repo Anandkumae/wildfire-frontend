@@ -20,6 +20,7 @@ const WebcamDetection = ({ onFireDetected, isMonitoring, setIsMonitoring }) => {
     lastDetection: null,
     fps: 0
   });
+  const [latestDetections, setLatestDetections] = useState([]); // Store latest detection results for visualization
 
   // Start local webcam
   const startWebcam = async () => {
@@ -221,10 +222,11 @@ const WebcamDetection = ({ onFireDetected, isMonitoring, setIsMonitoring }) => {
       // Draw current frame to canvas
       context.drawImage(sourceElement, 0, 0, canvas.width, canvas.height);
 
-      // Convert canvas to base64 image
-      const frameData = canvas.toDataURL('image/jpeg', 0.8);
+      // Convert canvas to base64 image with HIGH quality for better detection
+      const frameData = canvas.toDataURL('image/jpeg', 0.95); // Increased from 0.8 to 0.95
 
-      console.log(`🎬 Sending frame for detection (${cameraMode} mode)...`);
+      console.log(`🎬 Sending frame for detection (${cameraMode} mode, ${canvas.width}x${canvas.height})...`);
+      console.log(`📦 Frame data size: ${(frameData.length / 1024).toFixed(2)} KB`);
 
       // Send frame to backend for detection
       const response = await axios.post('http://localhost:8000/detect/frame', {
@@ -234,6 +236,10 @@ const WebcamDetection = ({ onFireDetected, isMonitoring, setIsMonitoring }) => {
       const result = response.data;
       
       console.log('🔍 Detection result:', result);
+      console.log(`📊 Detections: ${result.detections?.length || 0}, Has Fire: ${result.has_fire}`);
+      
+      // Store detections for visualization
+      setLatestDetections(result.detections || []);
 
       // Update stats
       setStats(prev => ({
@@ -262,12 +268,52 @@ const WebcamDetection = ({ onFireDetected, isMonitoring, setIsMonitoring }) => {
       } else {
         console.log('✅ No fire detected in this frame');
       }
+      
+      // Draw detection boxes on canvas for visualization
+      if (result.detections && result.detections.length > 0) {
+        drawDetectionBoxes(context, result.detections, canvas.width, canvas.height);
+      }
     } catch (err) {
       console.error('❌ Error detecting frame:', err);
       if (err.response) {
         console.error('Backend response:', err.response.data);
+        console.error('Status code:', err.response.status);
       }
+      setLatestDetections([]); // Clear detections on error
     }
+  };
+
+  // Draw detection boxes on canvas
+  const drawDetectionBoxes = (context, detections, width, height) => {
+    context.strokeStyle = '#ff0000';
+    context.lineWidth = 3;
+    context.font = '16px Arial';
+    context.fillStyle = '#ff0000';
+    
+    detections.forEach(detection => {
+      if (detection.bbox && detection.bbox.length === 4) {
+        const [x1, y1, x2, y2] = detection.bbox;
+        const boxWidth = x2 - x1;
+        const boxHeight = y2 - y1;
+        
+        // Draw rectangle
+        context.strokeRect(x1, y1, boxWidth, boxHeight);
+        
+        // Draw label with confidence
+        const label = `Fire ${(detection.confidence * 100).toFixed(1)}%`;
+        const textWidth = context.measureText(label).width;
+        
+        // Background for text
+        context.fillStyle = '#ff0000';
+        context.fillRect(x1, y1 - 25, textWidth + 10, 25);
+        
+        // Text
+        context.fillStyle = '#ffffff';
+        context.fillText(label, x1 + 5, y1 - 7);
+        
+        console.log(`📦 Drawing box: [${x1.toFixed(0)}, ${y1.toFixed(0)}, ${x2.toFixed(0)}, ${y2.toFixed(0)}] - ${label}`);
+      }
+    });
   };
 
   // Start monitoring
@@ -282,13 +328,13 @@ const WebcamDetection = ({ onFireDetected, isMonitoring, setIsMonitoring }) => {
     
     setIsMonitoring(true);
     
-    // Capture and detect frames every 1 second (1 FPS)
+    // Capture and detect frames every 500ms (2 FPS) - increased from 1 FPS
     intervalRef.current = setInterval(() => {
       captureAndDetect();
-    }, 1000);
+    }, 500); // Changed from 1000ms to 500ms
 
     // Calculate FPS
-    setStats(prev => ({ ...prev, fps: 1 }));
+    setStats(prev => ({ ...prev, fps: 2 })); // Updated from 1 to 2
   };
 
   // Stop monitoring
@@ -410,8 +456,12 @@ const WebcamDetection = ({ onFireDetected, isMonitoring, setIsMonitoring }) => {
           />
         )}
         
-        {/* Hidden canvas for frame capture */}
-        <canvas ref={canvasRef} className="hidden" />
+        {/* Canvas overlay for detection boxes */}
+        <canvas 
+          ref={canvasRef} 
+          className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+          style={{ zIndex: 10 }}
+        />
 
         {/* Overlay when not active */}
         {!hasPermission && (
