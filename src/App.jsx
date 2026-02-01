@@ -7,6 +7,7 @@ import DetectionLog from './components/DetectionLog';
 import VideoPreview from './components/VideoPreview';
 import InstantAlert from './components/InstantAlert';
 import WebcamDetection from './components/WebcamDetection';
+import FireMap from './components/FireMap';
 import { detectFireSmoke, detectFireSmokeStreaming, detectSatelliteFire } from './services/api';
 import audioAlert from './utils/audioAlert';
 import './index.css';
@@ -35,6 +36,11 @@ function App() {
   // Emergency stop state - stops all monitoring and alerts
   const [isEmergencyStop, setIsEmergencyStop] = useState(false);
 
+  // Satellite alerts state - for NASA FIRMS real-time fire data
+  const [satelliteAlerts, setSatelliteAlerts] = useState(null);
+  const [loadingSatelliteAlerts, setLoadingSatelliteAlerts] = useState(false);
+  const [satelliteFilter, setSatelliteFilter] = useState('all'); // 'all', 'verified', 'unverified', 'false_alarms'
+
   // Save to localStorage whenever alerts or history changes
   useEffect(() => {
     localStorage.setItem('wildfire-alerts', JSON.stringify(alerts));
@@ -47,6 +53,86 @@ function App() {
   const handleFileSelect = (file) => {
     setSelectedFile(file);
     setDetectionResult(null);
+  };
+
+  // Load satellite alerts from NASA FIRMS
+  const loadSatelliteAlerts = async () => {
+    setLoadingSatelliteAlerts(true);
+    try {
+      const response = await fetch('http://127.0.0.1:8000/satellite-alerts');
+      const data = await response.json();
+      setSatelliteAlerts(data);
+      console.log('🛰️ Satellite alerts loaded:', data);
+      
+      // 🎯 INTELLIGENT SYSTEM: Trigger enhanced detection if fires detected
+      if (data.count > 0) {
+        handleSatelliteFireDetected(data);
+      }
+    } catch (error) {
+      console.error('❌ Error loading satellite alerts:', error);
+      setSatelliteAlerts({ error: error.message, count: 0, alerts: [] });
+    } finally {
+      setLoadingSatelliteAlerts(false);
+    }
+  };
+
+  // 🧠 INTELLIGENT ALERT SYSTEM: Respond to satellite fire detections
+  const handleSatelliteFireDetected = (data) => {
+    console.log('🚨 SATELLITE FIRE ALERT SYSTEM ACTIVATED');
+    console.log(`📊 ${data.count} fire hotspot(s) detected in region`);
+    
+    // Create high-priority alert
+    const satelliteAlert = {
+      id: `satellite-alert-${Date.now()}`,
+      message: `🛰️ SATELLITE ALERT: ${data.count} fire hotspot(s) detected!`,
+      details: `NASA MODIS detected active fires in the region. Enhanced monitoring recommended.`,
+      severity: 'critical',
+      timestamp: new Date().toLocaleString(),
+      source: 'NASA FIRMS'
+    };
+    
+    // Add to alerts list
+    setAlerts(prev => [satelliteAlert, ...prev]);
+    
+    // Show instant popup
+    setInstantAlert(satelliteAlert);
+    
+    // Play audio alert
+    audioAlert.playFireAlarm(2000);
+    
+    // Browser notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('🛰️ SATELLITE FIRE ALERT', {
+        body: `${data.count} fire hotspot(s) detected by NASA MODIS satellite`,
+        icon: '/fire-icon.png',
+      });
+    }
+    
+    console.log('✅ Enhanced detection mode activated');
+    console.log('📸 Camera systems should increase sensitivity');
+    console.log('🚨 Local authorities should be notified');
+  };
+
+  // Get filtered alerts based on selected filter
+  const getFilteredAlerts = () => {
+    if (!satelliteAlerts) return [];
+    
+    switch (satelliteFilter) {
+      case 'all':
+        return [
+          ...(satelliteAlerts.alerts || []),
+          ...(satelliteAlerts.unverified_alerts || []),
+          ...(satelliteAlerts.false_alarms || [])
+        ];
+      case 'verified':
+        return satelliteAlerts.alerts || [];
+      case 'unverified':
+        return satelliteAlerts.unverified_alerts || [];
+      case 'false_alarms':
+        return satelliteAlerts.false_alarms || [];
+      default:
+        return satelliteAlerts.alerts || [];
+    }
   };
 
 
@@ -459,42 +545,252 @@ function App() {
               />
             ) : (
               <>
-                {/* File Upload */}
-            <FileUpload
-              onFileSelect={handleFileSelect}
-              accept="image/*,video/*"
-              maxSize={10}
-            />
+                {/* File Upload - Only for fire-smoke tab */}
+                {activeTab !== 'satellite' && (
+                  <>
+                    <FileUpload
+                      onFileSelect={handleFileSelect}
+                      accept="image/*,video/*"
+                      maxSize={10}
+                    />
 
-            {/* Detect Button */}
-            {selectedFile && (
-              <button
-                onClick={handleDetection}
-                disabled={isLoading}
-                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Flame className="w-5 h-5" />
-                    Start Detection
+                    {/* Detect Button */}
+                    {selectedFile && (
+                      <button
+                        onClick={handleDetection}
+                        disabled={isLoading}
+                        className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Flame className="w-5 h-5" />
+                            Start Detection
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {/* Video Preview - Shows during analysis */}
+                    {selectedFile && selectedFile.type.startsWith('video/') && (
+                      <VideoPreview file={selectedFile} isAnalyzing={isLoading} />
+                    )}
+
+                    {/* Detection Result */}
+                    {detectionResult && (
+                      <DetectionResult result={detectionResult} type={activeTab} />
+                    )}
                   </>
                 )}
-              </button>
+            {/* Satellite Alerts Section - NASA FIRMS Real-time Data */}
+            {activeTab === 'satellite' && (
+              <div className="glass-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Satellite className="w-6 h-6 text-fire-500" />
+                    NASA FIRMS Satellite Alerts
+                  </h3>
+                  <button
+                    onClick={loadSatelliteAlerts}
+                    disabled={loadingSatelliteAlerts}
+                    className="btn-primary flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {loadingSatelliteAlerts ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <Satellite className="w-4 h-4" />
+                        Load Real-time Alerts
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-sm text-gray-400 mb-4">
+                  Fetch near-real-time fire hotspots from NASA MODIS satellite data (India region, last 24 hours)
+                  <br />
+                  <span className="text-green-400">✨ With intelligent visual verification to reduce false alarms</span>
+                </p>
+
+                {/* Satellite Alerts Display */}
+                {satelliteAlerts && (
+                  <div className="space-y-4">
+                    {satelliteAlerts.error ? (
+                      <div className="p-4 bg-red-500/20 border border-red-500 rounded-lg">
+                        <p className="text-red-400">❌ Error: {satelliteAlerts.error}</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Verification Stats - CLICKABLE */}
+                        {satelliteAlerts.verification_stats && (
+                          <div className="grid grid-cols-4 gap-3 mb-4">
+                            <button
+                              onClick={() => setSatelliteFilter('all')}
+                              className={`p-3 rounded-lg text-center transition-all cursor-pointer hover:scale-105 ${
+                                satelliteFilter === 'all'
+                                  ? 'bg-blue-500/30 border-2 border-blue-400 ring-2 ring-blue-400'
+                                  : 'bg-blue-500/20 border border-blue-500'
+                              }`}
+                            >
+                              <div className="text-2xl font-bold text-blue-400">
+                                {satelliteAlerts.verification_stats.total_hotspots}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">All Hotspots</div>
+                            </button>
+                            <button
+                              onClick={() => setSatelliteFilter('verified')}
+                              className={`p-3 rounded-lg text-center transition-all cursor-pointer hover:scale-105 ${
+                                satelliteFilter === 'verified'
+                                  ? 'bg-green-500/30 border-2 border-green-400 ring-2 ring-green-400'
+                                  : 'bg-green-500/20 border border-green-500'
+                              }`}
+                            >
+                              <div className="text-2xl font-bold text-green-400">
+                                {satelliteAlerts.count}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">Verified Fires</div>
+                            </button>
+                            <button
+                              onClick={() => setSatelliteFilter('unverified')}
+                              className={`p-3 rounded-lg text-center transition-all cursor-pointer hover:scale-105 ${
+                                satelliteFilter === 'unverified'
+                                  ? 'bg-yellow-500/30 border-2 border-yellow-400 ring-2 ring-yellow-400'
+                                  : 'bg-yellow-500/20 border border-yellow-500'
+                              }`}
+                            >
+                              <div className="text-2xl font-bold text-yellow-400">
+                                {satelliteAlerts.unverified_count}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">Unverified</div>
+                            </button>
+                            <button
+                              onClick={() => setSatelliteFilter('false_alarms')}
+                              className={`p-3 rounded-lg text-center transition-all cursor-pointer hover:scale-105 ${
+                                satelliteFilter === 'false_alarms'
+                                  ? 'bg-red-500/30 border-2 border-red-400 ring-2 ring-red-400'
+                                  : 'bg-red-500/20 border border-red-500'
+                              }`}
+                            >
+                              <div className="text-2xl font-bold text-red-400">
+                                {satelliteAlerts.false_alarms_rejected}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">False Alarms</div>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* System Intelligence Badge */}
+                        {satelliteAlerts.system_intelligence && (
+                          <div className="p-4 bg-purple-500/20 border border-purple-500 rounded-lg">
+                            <div className="flex items-start gap-3">
+                              <div className="text-2xl">🧠</div>
+                              <div className="flex-1">
+                                <div className="font-semibold text-purple-300 mb-1">
+                                  Intelligent Verification System
+                                </div>
+                                <div className="text-sm text-gray-300">
+                                  {satelliteAlerts.system_intelligence.description}
+                                </div>
+                                <div className="text-xs text-purple-400 mt-2">
+                                  ⚡ {satelliteAlerts.system_intelligence.accuracy_improvement}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="p-4 bg-blue-500/20 border border-blue-500 rounded-lg">
+                          <p className="text-blue-400 font-semibold">
+                            🛰️ Showing {getFilteredAlerts().length} {
+                              satelliteFilter === 'all' ? 'total hotspot(s)' :
+                              satelliteFilter === 'verified' ? 'verified fire(s)' :
+                              satelliteFilter === 'unverified' ? 'unverified hotspot(s)' :
+                              'false alarm(s)'
+                            }
+                          </p>
+                        </div>
+
+                        {getFilteredAlerts().length > 0 && (
+                          <div className="max-h-96 overflow-y-auto space-y-2">
+                            {getFilteredAlerts().map((alert, index) => (
+                              <div
+                                key={index}
+                                className="p-4 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
+                              >
+                                {/* Verification Badge */}
+                                {alert.verification && (
+                                  <div className="mb-2">
+                                    {alert.verification.status === 'verified_wildfire' && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/20 border border-green-500 rounded text-xs text-green-400">
+                                        ✅ Verified (Thermal + Visual)
+                                      </span>
+                                    )}
+                                    {alert.verification.status === 'unverified_no_imagery' && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-500/20 border border-yellow-500 rounded text-xs text-yellow-400">
+                                        ⚠️ Unverified (High Thermal Only)
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  <div>
+                                    <span className="text-gray-400">Location:</span>
+                                    <span className="text-white ml-2">
+                                      {alert.lat.toFixed(4)}, {alert.lon.toFixed(4)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400">Confidence:</span>
+                                    <span className="text-fire-500 ml-2 font-semibold">
+                                      {alert.confidence}%
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400">Fire Power (FRP):</span>
+                                    <span className="text-white ml-2">{alert.frp} MW</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400">Detected:</span>
+                                    <span className="text-white ml-2">
+                                      {alert.date} {alert.time}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {getFilteredAlerts().length === 0 && (
+                          <div className="p-4 bg-green-500/20 border border-green-500 rounded-lg">
+                            <p className="text-green-400">
+                              ✅ No {
+                                satelliteFilter === 'all' ? 'hotspots' :
+                                satelliteFilter === 'verified' ? 'verified fires' :
+                                satelliteFilter === 'unverified' ? 'unverified hotspots' :
+                                'false alarms'
+                              } in this category
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* Video Preview - Shows during analysis */}
-            {selectedFile && selectedFile.type.startsWith('video/') && (
-              <VideoPreview file={selectedFile} isAnalyzing={isLoading} />
-            )}
-
-            {/* Detection Result */}
-            {detectionResult && (
-              <DetectionResult result={detectionResult} type={activeTab} />
+            {/* Fire Map - Show map with filtered alerts */}
+            {activeTab === 'satellite' && satelliteAlerts && getFilteredAlerts().length > 0 && (
+              <FireMap alerts={getFilteredAlerts()} />
             )}
               </>
             )}
