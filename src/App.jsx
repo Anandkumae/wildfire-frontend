@@ -59,7 +59,8 @@ function App() {
   const loadSatelliteAlerts = async () => {
     setLoadingSatelliteAlerts(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/satellite-alerts');
+      const response = await fetch("https://wildfire-backend-4.onrender.com//satellite-alerts");
+;
       const data = await response.json();
       setSatelliteAlerts(data);
       console.log('🛰️ Satellite alerts loaded:', data);
