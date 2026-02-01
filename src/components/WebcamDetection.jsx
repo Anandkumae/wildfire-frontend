@@ -2,6 +2,8 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Video, VideoOff, Play, Square, AlertCircle, Camera, Wifi, Smartphone } from 'lucide-react';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const WebcamDetection = ({ onFireDetected, isMonitoring, setIsMonitoring }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -69,7 +71,7 @@ const WebcamDetection = ({ onFireDetected, isMonitoring, setIsMonitoring }) => {
       console.log('🔗 Connecting to network camera (snapshot mode):', snapshotUrl);
 
       // Use backend proxy to avoid CORS issues
-      const proxyUrl = `http://localhost:8000/proxy/camera?url=${encodeURIComponent(snapshotUrl)}`;
+      const proxyUrl = `${API_BASE_URL}/proxy/camera?url=${encodeURIComponent(snapshotUrl)}`;
       console.log('🔄 Using proxy URL:', proxyUrl);
 
       if (imgRef.current) {
@@ -229,7 +231,7 @@ const WebcamDetection = ({ onFireDetected, isMonitoring, setIsMonitoring }) => {
       console.log(`📦 Frame data size: ${(frameData.length / 1024).toFixed(2)} KB`);
 
       // Send frame to backend for detection
-      const response = await axios.post('http://localhost:8000/detect/frame', {
+      const response = await axios.post(`${API_BASE_URL}/detect/frame`, {
         frame: frameData
       });
 

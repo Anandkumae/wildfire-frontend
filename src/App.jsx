@@ -12,6 +12,8 @@ import { detectFireSmoke, detectFireSmokeStreaming, detectSatelliteFire } from '
 import audioAlert from './utils/audioAlert';
 import './index.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 function App() {
   const [activeTab, setActiveTab] = useState('fire-smoke');
   const [selectedFile, setSelectedFile] = useState(null);
@@ -59,7 +61,7 @@ function App() {
   const loadSatelliteAlerts = async () => {
     setLoadingSatelliteAlerts(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/satellite-alerts');
+      const response = await fetch(`${API_BASE_URL}/satellite-alerts`);
       const data = await response.json();
       setSatelliteAlerts(data);
       console.log('🛰️ Satellite alerts loaded:', data);
@@ -362,7 +364,7 @@ function App() {
         response: error.response?.data,
         status: error.response?.status
       });
-      alert(`Error processing file: ${error.message}\n\nPlease ensure the backend server is running on http://localhost:8000`);
+      alert(`Error processing file: ${error.message}\n\nPlease ensure the backend server is running at ${API_BASE_URL}`);
       setIsLoading(false);
     }
   };
