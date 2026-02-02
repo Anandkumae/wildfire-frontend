@@ -116,3 +116,20 @@ export const detectSatelliteFire = async (file) => {
   const response = await api.post('/detect/satellite-fire', formData);
   return response.data;
 };
+
+/**
+ * Get detailed hotspot analysis from Google Earth Engine
+ * Fetches real satellite imagery and temperature data for a specific location
+ * 
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @param {string} date - Optional date in YYYY-MM-DD format
+ * @returns {Promise} Hotspot details with satellite imagery and temperature
+ */
+export const getHotspotDetails = async (lat, lon, date = null) => {
+  const params = new URLSearchParams({ lat, lon });
+  if (date) params.append('date', date);
+  
+  const response = await axios.get(`${API_BASE_URL}/api/hotspot-details?${params.toString()}`);
+  return response.data;
+};
