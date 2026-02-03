@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Video, VideoOff, Play, Square, AlertCircle, Camera, Wifi, Smartphone } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://wildfire-backend-4.onrender.com';
 
 const WebcamDetection = ({ onFireDetected, isMonitoring, setIsMonitoring }) => {
   const videoRef = useRef(null);

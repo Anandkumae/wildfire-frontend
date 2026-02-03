@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://wildfire-backend-4.onrender.com';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -126,9 +126,11 @@ export const detectSatelliteFire = async (file) => {
  * @param {string} date - Optional date in YYYY-MM-DD format
  * @returns {Promise} Hotspot details with satellite imagery and temperature
  */
-export const getHotspotDetails = async (lat, lon, date = null) => {
+export const getHotspotDetails = async (lat, lon, date = null, frp = null, confidence = null) => {
   const params = new URLSearchParams({ lat, lon });
   if (date) params.append('date', date);
+  if (frp) params.append('frp', frp);
+  if (confidence) params.append('confidence', confidence);
   
   const response = await axios.get(`${API_BASE_URL}/api/hotspot-details?${params.toString()}`);
   return response.data;

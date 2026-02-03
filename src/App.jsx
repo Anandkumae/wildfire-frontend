@@ -12,7 +12,7 @@ import { detectFireSmoke, detectFireSmokeStreaming, detectSatelliteFire } from '
 import audioAlert from './utils/audioAlert';
 import './index.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://wildfire-backend-4.onrender.com';
 
 function App() {
   const [activeTab, setActiveTab] = useState('fire-smoke');
