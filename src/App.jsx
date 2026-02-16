@@ -405,6 +405,7 @@ function App() {
   };
 
   // Resume monitoring after emergency stop
+  //nothing
   const handleResumeMonitoring = () => {
     console.log('▶️ Resuming monitoring');
     setIsEmergencyStop(false);
